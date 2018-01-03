@@ -1,171 +1,100 @@
 #**Traffic Sign Recognition** 
 
-##Writeup Template
-
-###You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
-
----
-
-**Build a Traffic Sign Recognition Project**
-
-The goals / steps of this project are the following:
-* Load the data set (see below for links to the project data set)
+**Goals**
+The goals of this project were to:
 * Explore, summarize and visualize the data set
 * Design, train and test a model architecture
 * Use the model to make predictions on new images
 * Analyze the softmax probabilities of the new images
-* Summarize the results with a written report
-
-
-[//]: # (Image References)
-
-[image1]: ./examples/visualization.jpg "Visualization"
-[image2]: ./examples/grayscale.jpg "Grayscaling"
-[image3]: ./examples/random_noise.jpg "Random Noise"
-[image4]: ./examples/placeholder.png "Traffic Sign 1"
-[image5]: ./examples/placeholder.png "Traffic Sign 2"
-[image6]: ./examples/placeholder.png "Traffic Sign 3"
-[image7]: ./examples/placeholder.png "Traffic Sign 4"
-[image8]: ./examples/placeholder.png "Traffic Sign 5"
-
-## Rubric Points
-###Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/481/view) individually and describe how I addressed each point in my implementation.  
 
 ---
-###Writeup / README
-
-####1. Provide a Writeup / README that includes all the rubric points and how you addressed each one. You can submit your writeup as markdown or pdf. You can use this template as a guide for writing the report. The submission includes the project code.
-
-You're reading it! and here is a link to my [project code](https://github.com/udacity/CarND-Traffic-Sign-Classifier-Project/blob/master/Traffic_Sign_Classifier.ipynb)
-
-###Data Set Summary & Exploration
-
-####1. Provide a basic summary of the data set. In the code, the analysis should be done using python, numpy and/or pandas methods rather than hardcoding results manually.
-
-I used the pandas library to calculate summary statistics of the traffic
-signs data set:
-
-* The size of training set is ?
-* The size of the validation set is ?
-* The size of test set is ?
-* The shape of a traffic sign image is ?
-* The number of unique classes/labels in the data set is ?
-
-####2. Include an exploratory visualization of the dataset.
-
-Here is an exploratory visualization of the data set. It is a bar chart showing how the data ...
-
-![alt text][image1]
 
 ###Design and Test a Model Architecture
 
-####1. Describe how you preprocessed the image data. What techniques were chosen and why did you choose these techniques? Consider including images showing the output of each preprocessing technique. Pre-processing refers to techniques such as converting to grayscale, normalization, etc. (OPTIONAL: As described in the "Stand Out Suggestions" part of the rubric, if you generated additional data for training, describe why you decided to generate additional data, how you generated the data, and provide example images of the additional data. Then describe the characteristics of the augmented training set like number of images in the set, number of images for each class, etc.)
+####1. Preprocessing steps
 
-As a first step, I decided to convert the images to grayscale because ...
+I applied a few preprocessing steps to each image, and created new images from some transformations.
+I applied grayscale and pixel normalization to each image...the rationale for both of these choices is that it cuts down
+on uninformative noise and focuses on features that will be useful during training. If I had more time, I had planned to increase the image contrast and zoom in on images (borders and background are, generally, not helpful for classification of a foreground image) for the same reasons.
 
-Here is an example of a traffic sign image before and after grayscaling.
+I also increased the size of the data by providing a slight right-rotation and left-rotation of each image. This does 2 things: 1) just plainly gives me more data, which can't be bad and 2) makes the dataset more robust to variations in images.
 
-![alt text][image2]
-
-As a last step, I normalized the image data because ...
-
-I decided to generate additional data because ... 
-
-To add more data to the the data set, I used the following techniques because ... 
-
-Here is an example of an original image and an augmented image:
-
-![alt text][image3]
-
-The difference between the original data set and the augmented data set is the following ... 
-
-
-####2. Describe what your final model architecture looks like including model type, layers, layer sizes, connectivity, etc.) Consider including a diagram and/or table describing the final model.
-
+####2. Final Model architecture
 My final model consisted of the following layers:
+```
+def Net(x):
+    """Convolutional neural net model."""
+    # Hyperparameters
+    mu = 0
+    sigma = 0.1
 
-| Layer         		|     Description	        					| 
-|:---------------------:|:---------------------------------------------:| 
-| Input         		| 32x32x3 RGB image   							| 
-| Convolution 3x3     	| 1x1 stride, same padding, outputs 32x32x64 	|
-| RELU					|												|
-| Max pooling	      	| 2x2 stride,  outputs 16x16x64 				|
-| Convolution 3x3	    | etc.      									|
-| Fully connected		| etc.        									|
-| Softmax				| etc.        									|
-|						|												|
-|						|												|
+    # Layer 1: Convolutional. Input = 32x32x3. Output = 28x28x20.
+    conv1 = conv_layer(x, 5, 3, 20)
+    # Activation.
+    conv1 = tf.nn.relu(conv1)
+    # Pooling. Input = 28x28x20. Output = 14x14x36.
+    conv1 = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
+
+    # Layer 2: Convolutional. Output = 10x10x36.
+    conv2 = conv_layer(conv1, 5, 20, 36)
+    # Activation.
+    conv2 = tf.nn.relu(conv2)
+    # Pooling. Input = 10x10x36. Output = 5x5x16.
+    conv2 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
+
+    # Flatten. Input = 5x5x36. Output = 900.
+    fc0   = flatten(conv2)
+
+    # Layer 3: Fully Connected. Input = 900. Output = 120.
+    fc1_W = tf.Variable(tf.truncated_normal(shape=(900, 120), mean = mu, stddev = sigma))
+    fc1_b = tf.Variable(tf.zeros(120))
+    fc1   = tf.matmul(fc0, fc1_W) + fc1_b
+
+    # Activation.
+    fc1    = tf.nn.relu(fc1)
+    # But .. add dropout for this activation layer.
+    fc1 = tf.nn.dropout(fc1, keep_prob)
+
+    # Layer 4: Fully Connected. Input = 120. Output = 84.
+    fc2_W  = tf.Variable(tf.truncated_normal(shape=(120, 84), mean = mu, stddev = sigma))
+    fc2_b  = tf.Variable(tf.zeros(84))
+    fc2    = tf.matmul(fc1, fc2_W) + fc2_b
+    
+    # Activation
+    fc2    = tf.nn.relu(fc2)
+    # But ... add dropout for this activation layer
+    fc2 = tf.nn.dropout(fc2, keep_prob)
+
+    # Layer 5: Fully Connected. Input = 84. Output = 43.
+    fc3_W  = tf.Variable(tf.truncated_normal(shape=(84, 43), mean = mu, stddev = sigma))    
+    fc3_b  = tf.Variable(tf.zeros(43))
+    logits = tf.matmul(fc2, fc3_W) + fc3_b
+
+    return logits
+ ```
  
+ This is roughly a copy of the famous LeNet architecture..with the addition of dropout and max_pool layers.
 
+####3. Model Training
+The model was trained with the following hyperparameters:
+rate = 0.0005  # Learning rate
+EPOCHS = 17 # Number of training cycles
+BATCH_SIZE = 128 # Number of images per batch
 
-####3. Describe how you trained your model. The discussion can include the type of optimizer, the batch size, number of epochs and any hyperparameters such as learning rate.
-
-To train the model, I used an ....
-
-####4. Describe the approach taken for finding a solution and getting the validation set accuracy to be at least 0.93. Include in the discussion the results on the training, validation and test sets and where in the code these were calculated. Your approach may have been an iterative process, in which case, outline the steps you took to get to the final solution and why you chose those steps. Perhaps your solution involved an already well known implementation or architecture. In this case, discuss why you think the architecture is suitable for the current problem.
+I also applied L2-norm regularization (tf.nn.l2_loss) across the dataset, which had a good effect on training accuracy.
 
 My final model results were:
-* training set accuracy of ?
-* validation set accuracy of ? 
-* test set accuracy of ?
+EPOCH 17 ...
+Validation Accuracy = 0.944
 
-If an iterative approach was chosen:
-* What was the first architecture that was tried and why was it chosen?
-* What were some problems with the initial architecture?
-* How was the architecture adjusted and why was it adjusted? Typical adjustments could include choosing a different model architecture, adding or taking away layers (pooling, dropout, convolution, etc), using an activation function or changing the activation function. One common justification for adjusting an architecture would be due to overfitting or underfitting. A high accuracy on the training set but low accuracy on the validation set indicates over fitting; a low accuracy on both sets indicates under fitting.
-* Which parameters were tuned? How were they adjusted and why?
-* What are some of the important design choices and why were they chosen? For example, why might a convolution layer work well with this problem? How might a dropout layer help with creating a successful model?
+After model done training:
+Test Accuracy = 0.931
 
-If a well known architecture was chosen:
-* What architecture was chosen?
-* Why did you believe it would be relevant to the traffic sign application?
-* How does the final model's accuracy on the training, validation and test set provide evidence that the model is working well?
- 
+I chose the LeNet architecture as a starting point and it brought me close to the required training accuracy along with the image preprocessing steps I had coded up originally. Adding dropout helped raise the accuracy quite a bit. Ultimately, tuning hyperparameters was not near as useful as choosing a good, established architecture and preprocessing the images.
+
 
 ###Test a Model on New Images
 
-####1. Choose five German traffic signs found on the web and provide them in the report. For each image, discuss what quality or qualities might be difficult to classify.
+The 5 german traffic signs I found were screenshots from walking around in Berlin with Google's streetview feature.
 
-Here are five German traffic signs that I found on the web:
-
-![alt text][image4] ![alt text][image5] ![alt text][image6] 
-![alt text][image7] ![alt text][image8]
-
-The first image might be difficult to classify because ...
-
-####2. Discuss the model's predictions on these new traffic signs and compare the results to predicting on the test set. At a minimum, discuss what the predictions were, the accuracy on these new predictions, and compare the accuracy to the accuracy on the test set (OPTIONAL: Discuss the results in more detail as described in the "Stand Out Suggestions" part of the rubric).
-
-Here are the results of the prediction:
-
-| Image			        |     Prediction	        					| 
-|:---------------------:|:---------------------------------------------:| 
-| Stop Sign      		| Stop sign   									| 
-| U-turn     			| U-turn 										|
-| Yield					| Yield											|
-| 100 km/h	      		| Bumpy Road					 				|
-| Slippery Road			| Slippery Road      							|
-
-
-The model was able to correctly guess 4 of the 5 traffic signs, which gives an accuracy of 80%. This compares favorably to the accuracy on the test set of ...
-
-####3. Describe how certain the model is when predicting on each of the five new images by looking at the softmax probabilities for each prediction. Provide the top 5 softmax probabilities for each image along with the sign type of each probability. (OPTIONAL: as described in the "Stand Out Suggestions" part of the rubric, visualizations can also be provided such as bar charts)
-
-The code for making predictions on my final model is located in the 11th cell of the Ipython notebook.
-
-For the first image, the model is relatively sure that this is a stop sign (probability of 0.6), and the image does contain a stop sign. The top five soft max probabilities were
-
-| Probability         	|     Prediction	        					| 
-|:---------------------:|:---------------------------------------------:| 
-| .60         			| Stop sign   									| 
-| .20     				| U-turn 										|
-| .05					| Yield											|
-| .04	      			| Bumpy Road					 				|
-| .01				    | Slippery Road      							|
-
-
-For the second image ... 
-
-### (Optional) Visualizing the Neural Network (See Step 4 of the Ipython notebook for more details)
-####1. Discuss the visual output of your trained network's feature maps. What characteristics did the neural network use to make classifications?
-
-
+Ultimately, I was unable to classify new images. The issue was that I was getting the exact same prediction vectors for each new image. At first, I had assumed this was a problem with tensorflow not loading the saved session appopriately. However, getting a prediction for my new images in the same `with` (and resulting `tf.Session` bound variable) I was still not able to get any difference for each new image (this rules out the notion that tensorflow may not have been saving or restoring the model appropriately)
